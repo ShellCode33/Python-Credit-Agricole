@@ -1,10 +1,15 @@
 # coding: utf-8
 
+"""
+This Command Line Interface only aims to showcase how this library can be used.
+It doesn't do anything useful.
+"""
+
 import os
 import argparse
 from getpass import getpass
 
-from creditagricole.api import CreditAgricole
+from creditagricole.api import CreditAgricole, CreditAgricoleException
 from creditagricole import CA_COUNTRIES
 
 def parse_cli() -> argparse.Namespace:
@@ -16,8 +21,8 @@ def parse_cli() -> argparse.Namespace:
     args = parser.parse_args()
     return args
 
-def main() -> None:
-    args = parse_cli()
+def summary(country: str, region: str) -> None:
+    ca = CA_COUNTRIES[country](region) # type: CreditAgricole
 
     try:
         user_id = os.environ["CA_USER_ID"]
@@ -29,19 +34,38 @@ def main() -> None:
     except KeyError:
         pin_code = getpass("Pin code: ")
 
-    ca = CA_COUNTRIES[args.country](args.region) # type: CreditAgricole
     ca.login(user_id, pin_code)
-
-    print("Accounts:")
-    for account in ca.accounts:
-        print(account)
     print()
 
-    print("Loans:")
+    print("LOANS")
+    print("-" * 50)
     for loan in ca.loans:
         print(loan)
     print()
 
-    print("Insurances:")
+    print("INSURANCES")
+    print("-" * 50)
     for insurance in ca.insurances:
         print(insurance)
+    print()
+
+    print("ACCOUNTS")
+    print("-" * 50)
+
+    for account in ca.accounts:
+        print(account)
+        print()
+
+        print("Last transactions:")
+        for operation in account.operations[:5]:
+            print(operation)
+
+        print("-" * 50)
+
+def main() -> None:
+    args = parse_cli()
+
+    try:
+        summary(args.country, args.region)
+    except CreditAgricoleException as cae:
+        print(f"[ERROR] {cae}")
