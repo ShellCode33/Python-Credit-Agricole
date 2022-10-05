@@ -4,11 +4,15 @@
 This module is in charge of communicating with CreditAgricole's API.
 """
 
+import locale
 from requests import Session
 from enum import IntEnum
 from typing import List, Tuple
 
-from creditagricole.account import Account
+from datetime import datetime
+from locale import setlocale, LC_ALL
+
+from creditagricole.account import Account, Operation
 from creditagricole.insurance import Insurance
 from creditagricole.loan import Loan
 
@@ -29,6 +33,7 @@ class CreditAgricole:
     KEYPAD_ENDPOINT: str
     AUTH_ENDPOINT: str
     PRODUCT_ENDPOINT: str
+    OPERATION_ENDPOINT: str
 
     def __init__(self, region: str):
         """
@@ -40,6 +45,20 @@ class CreditAgricole:
 
         self._session = Session()
         self._region = region
+
+        self._cached_accounts = None
+        self._cached_loans = None
+        self._cached_insurances = None
+
+        resp = self._session.get(type(self).URL_PATTERN.format(region=region,
+                                                               endpoint=".html"))
+
+        if resp.status_code == 404:
+            raise CreditAgricoleException(f"{region} does not seem to be valid region")
+
+        if resp.status_code != 200:
+            raise CreditAgricoleException(f"couldnt get index page, "
+                                          f"got error {resp.status_code}")
 
     def _keypad_challenge(self, pin_code: str) -> Tuple[str, str]:
         """
@@ -55,7 +74,13 @@ class CreditAgricole:
         """
         keypad_url = type(self).URL_PATTERN.format(region=self._region,
                                                    endpoint=type(self).KEYPAD_ENDPOINT)
-        keypad_json = self._session.post(keypad_url).json()
+        resp = self._session.post(keypad_url)
+
+        if resp.status_code != 200:
+            raise CreditAgricoleException("couldnt get keypad, got error "
+                                          f"{resp.status_code} : {resp.content}")
+
+        keypad_json = resp.json()
 
         key_layout = keypad_json["keyLayout"]
         uuid = keypad_json["keypadId"] # type: str
@@ -66,7 +91,8 @@ class CreditAgricole:
 
             if pos == -1:
                 # Just in case, should never happen
-                raise CreditAgricoleException(f"{digit} not found in key layout: {key_layout}")
+                raise CreditAgricoleException(f"{digit} not found in key layout: "
+                                              f"{key_layout}")
 
             secret.append(str(pos))
 
@@ -81,9 +107,54 @@ class CreditAgricole:
 
         if resp.status_code != 200:
             raise CreditAgricoleException(f"PRODUCT_ENDPOINT returned error "
-                                          f"{resp.status_code} with content: {resp.content}")
+                                          f"{resp.status_code} with content: "
+                                          f"{resp.content}")
 
         return resp.json()
+
+    def _get_operations(self, product_type: ProductType,
+                              account_index: int,
+                              currency: str) -> List[Operation]:
+        operations = [] # type: List[Operation]
+
+        operations_endpoint = type(self).OPERATION_ENDPOINT.format(
+            product_id=product_type,
+            account_index=account_index,
+            currency=currency
+        )
+
+        operations_url = type(self).URL_PATTERN.format(region=self._region,
+                                                       endpoint=operations_endpoint)
+
+        resp = self._session.get(operations_url)
+
+        if resp.status_code != 200:
+            raise CreditAgricoleException(f"OPERATION_ENDPOINT returned error "
+                                          f"{resp.status_code} with content: "
+                                          f"{resp.content}")
+
+        for entry in resp.json()["listeOperations"]:
+
+            saved_locale = setlocale(LC_ALL)
+
+            # We need an english locale because the API returns english dates
+            try:
+                setlocale(LC_ALL, "en_GB.UTF-8")
+            except locale.Error:
+                setlocale(LC_ALL, "en_US.UTF-8")
+
+            date = datetime.strptime(entry["dateOperation"], "%b %d, %Y, %I:%M:%S %p")
+            setlocale(LC_ALL, saved_locale) # restore locale
+
+            operations.append(Operation(
+                label=entry["libelleOperation"].strip(),
+                type_label=entry["libelleTypeOperation"].strip(),
+                description=entry["libelleComplementaire"].strip(),
+                date=date,
+                amount=entry["montant"],
+            ))
+
+        return operations
 
     def login(self, user_id: str, pin_code: str):
         """
@@ -102,6 +173,7 @@ class CreditAgricole:
         except ValueError:
             raise CreditAgricoleException("user id and pin code are expected to "
                                           "be composed only of digits")
+
         keypad_uuid, secret = self._keypad_challenge(pin_code)
 
         auth_url = type(self).URL_PATTERN.format(region=self._region,
@@ -119,6 +191,10 @@ class CreditAgricole:
 
     @property
     def accounts(self) -> List[Account]:
+
+        if self._cached_accounts:
+            return self._cached_accounts
+
         accounts = [] # type: List[Account]
 
         for product_type in [ProductType.ACCOUNTS,
@@ -128,18 +204,32 @@ class CreditAgricole:
 
             for entry in accounts_json:
                 # TBC : are JSON entries names the same for other countries ?
+                account_index = entry["index"]
+                currency = entry["idDevise"]
+
+                operations = self._get_operations(product_type,
+                                                  account_index,
+                                                  currency)
+
                 accounts.append(Account(
                     id=entry["numeroCompte"],
+                    index=account_index,
                     owner=" ".join(entry["libellePartenaire"].split()),
                     balance=entry["solde"],
-                    currency=entry["libelleDevise"],
+                    currency=currency,
                     label=entry["libelleProduit"],
+                    operations=operations,
                 ))
 
+        self._cached_accounts = accounts
         return accounts
 
     @property
     def loans(self) -> List[Loan]:
+
+        if self._cached_loans:
+            return self._cached_loans
+
         loans = [] # type: List[Loan]
         loans_json = self._get_product(ProductType.LOANS)
 
@@ -160,10 +250,15 @@ class CreditAgricole:
                 currency=entry["libelleDevise"],
             ))
 
+        self._cached_loans = loans
         return loans
 
     @property
     def insurances(self) -> List[Insurance]:
+
+        if self._cached_insurances:
+            return self._cached_insurances
+
         insurances = [] # type: List[Insurance]
         insurances_json = self._get_product(ProductType.INSURANCES)
 
@@ -176,4 +271,5 @@ class CreditAgricole:
                 currency=entry["libelleDevise"],
             ))
 
+        self._cached_insurances = insurances
         return insurances

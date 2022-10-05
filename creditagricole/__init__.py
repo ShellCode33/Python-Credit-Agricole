@@ -12,6 +12,7 @@ class CreditAgricoleFrance(CreditAgricole):
     KEYPAD_ENDPOINT = "/acceder-a-mes-comptes.authenticationKeypad.json"
     AUTH_ENDPOINT = "/acceder-a-mes-comptes.html/j_security_check"
     PRODUCT_ENDPOINT = "/operations/synthese/_jcr_content.produits-valorisation.json/{product_id}"
+    OPERATION_ENDPOINT = "/operations/synthese/detail-comptes/jcr:content.n3.operations.json?grandeFamilleCode={product_id}&compteIdx={account_index}&idDevise={currency}&count=2147483647"
 
 class CreditAgricoleItaly(CreditAgricole):
     def __init__(self):
