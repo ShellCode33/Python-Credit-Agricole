@@ -8,7 +8,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='credit-agricole',
-    version='0.1',
+    version='0.1.1',
     description='Python library that allows you to retrieve bank details from the Credit Agricole website',
     long_description=long_description,
     long_description_content_type='text/markdown',
