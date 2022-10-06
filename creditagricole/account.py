@@ -22,4 +22,4 @@ class Account:
     balance: float
     currency: str
     label: str
-    operations: List[Transaction] = field(repr=False)
+    transactions: List[Transaction] = field(repr=False)

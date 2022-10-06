@@ -57,8 +57,8 @@ def summary(country: str, region: str) -> None:
         print()
 
         print("Last transactions:")
-        for operation in account.operations[:5]:
-            print(operation)
+        for transaction in account.transactions[:5]:
+            print(transaction)
 
         print("-" * 50)
 

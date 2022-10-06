@@ -112,21 +112,21 @@ class CreditAgricole:
 
         return resp.json()
 
-    def _get_operations(self, product_type: ProductType,
+    def _get_transactions(self, product_type: ProductType,
                               account_index: int,
                               currency: str) -> List[Transaction]:
-        operations = [] # type: List[Transaction]
+        transactions = [] # type: List[Transaction]
 
-        operations_endpoint = type(self).OPERATION_ENDPOINT.format(
+        transactions_endpoint = type(self).OPERATION_ENDPOINT.format(
             product_id=product_type,
             account_index=account_index,
             currency=currency
         )
 
-        operations_url = type(self).URL_PATTERN.format(region=self._region,
-                                                       endpoint=operations_endpoint)
+        transactions_url = type(self).URL_PATTERN.format(region=self._region,
+                                                       endpoint=transactions_endpoint)
 
-        resp = self._session.get(operations_url)
+        resp = self._session.get(transactions_url)
 
         if resp.status_code != 200:
             raise CreditAgricoleException(f"OPERATION_ENDPOINT returned error "
@@ -146,7 +146,7 @@ class CreditAgricole:
             date = datetime.strptime(entry["dateOperation"], "%b %d, %Y, %I:%M:%S %p")
             setlocale(LC_ALL, saved_locale) # restore locale
 
-            operations.append(Transaction(
+            transactions.append(Transaction(
                 id=entry["fitid"],
                 label=entry["libelleOperation"].strip(),
                 type_label=entry["libelleTypeOperation"].strip(),
@@ -155,7 +155,7 @@ class CreditAgricole:
                 amount=entry["montant"],
             ))
 
-        return operations
+        return transactions
 
     def login(self, user_id: str, pin_code: str):
         """
@@ -208,7 +208,7 @@ class CreditAgricole:
                 account_index = entry["index"]
                 currency = entry["idDevise"]
 
-                operations = self._get_operations(product_type,
+                transactions = self._get_transactions(product_type,
                                                   account_index,
                                                   currency)
 
@@ -219,7 +219,7 @@ class CreditAgricole:
                     balance=entry["solde"],
                     currency=currency,
                     label=entry["libelleProduit"],
-                    operations=operations,
+                    transactions=transactions,
                 ))
 
         self._cached_accounts = accounts
