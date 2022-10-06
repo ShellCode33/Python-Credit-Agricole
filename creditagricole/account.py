@@ -7,6 +7,7 @@ from typing import List
 
 @dataclass(frozen=True)
 class Operation:
+    id: str
     label: str
     type_label: str
     description: str

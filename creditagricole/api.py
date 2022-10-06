@@ -147,6 +147,7 @@ class CreditAgricole:
             setlocale(LC_ALL, saved_locale) # restore locale
 
             operations.append(Operation(
+                id=entry["fitid"],
                 label=entry["libelleOperation"].strip(),
                 type_label=entry["libelleTypeOperation"].strip(),
                 description=entry["libelleComplementaire"].strip(),
