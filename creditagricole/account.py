@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 @dataclass(frozen=True)
-class Operation:
+class Transaction:
     id: str
     label: str
     type_label: str
@@ -22,4 +22,4 @@ class Account:
     balance: float
     currency: str
     label: str
-    operations: List[Operation] = field(repr=False)
+    operations: List[Transaction] = field(repr=False)

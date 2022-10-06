@@ -12,7 +12,7 @@ from typing import List, Tuple
 from datetime import datetime
 from locale import setlocale, LC_ALL
 
-from creditagricole.account import Account, Operation
+from creditagricole.account import Account, Transaction
 from creditagricole.insurance import Insurance
 from creditagricole.loan import Loan
 
@@ -114,8 +114,8 @@ class CreditAgricole:
 
     def _get_operations(self, product_type: ProductType,
                               account_index: int,
-                              currency: str) -> List[Operation]:
-        operations = [] # type: List[Operation]
+                              currency: str) -> List[Transaction]:
+        operations = [] # type: List[Transaction]
 
         operations_endpoint = type(self).OPERATION_ENDPOINT.format(
             product_id=product_type,
@@ -146,7 +146,7 @@ class CreditAgricole:
             date = datetime.strptime(entry["dateOperation"], "%b %d, %Y, %I:%M:%S %p")
             setlocale(LC_ALL, saved_locale) # restore locale
 
-            operations.append(Operation(
+            operations.append(Transaction(
                 id=entry["fitid"],
                 label=entry["libelleOperation"].strip(),
                 type_label=entry["libelleTypeOperation"].strip(),
